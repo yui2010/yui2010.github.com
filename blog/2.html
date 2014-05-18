@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Yui2010.github.com by yui2010</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+ 
+        <h3>
+<a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>HBase MVCC </h3>（Multiversion concurrency control多版本并发控制）</p>
+
+<p>mvcc主要是在读写并发时通过设置数据时间版本不阻塞，很多数据库包括mysql  oracle等都应用这一原理，实现上有所不同。 hbase mvcc apache官网对其原理作了详细描述: <a href="https://blogs.apache.org/hbase/entry/apache_hbase_internals_locking_and">https://blogs.apache.org/hbase/entry/apache_hbase_internals_locking_and</a>
+下面分析是基于apache的0.98.1版本：</p>
+ </br>
+region server 在打开region时会初始化一个mvcc变量(HRegion类变量)，整个mvcc是控制在该region范围。
+<img src="img/mvcc01.png">
+ </br>
+初始化：遍历HRegion所有的HStore的maxMemstoreTS  取出其中的最大值并+1作为当前的读写点
+<img src="img/mvcc011.png">
+ </br>
+以前的hbase版本中类MultiVersionConsistencyControl叫ReadWriteConsistencyControl(这个描述更直接，但不专业)，mvcc 是使用时间戳TS(timestamp)来控制读写， 前面HStore的maxMemstoreTS跟实际数据KV的mvcc值以及MultiVersionConsistencyControl的memstoreRead和memstoreWrite都是同一性质，只是在描述上有所不同(有的用TS，有的用mvcc)，
+<img src="img/mvcc012.png">
+ </br>
+用户写数据(PUT) 最终会调用HRegionServer的mutate方法-->HRgion的batchMutate方法，然后会做部分操作(循环竞争行锁)-->doMiniBatchMutation(此方法较长，省略部分代码)
+<img src="img/mvcc013.png">
+ </br>
+1. 首先写操作(e.g. 用户A)获得行锁，用户B对此行数据的更改操作则会阻塞 </br>
+2. 用户A获得行锁后调用beginMemstoreInsert开始初始化mvcc </br>
+<img src="img/mvcc014.png">
+ </br>
+MultiVersionConsistencyControl的内部类WriteEntry
+<img src="img/mvcc015.png">
+ </br>
+3. 用户A写数据完成后释放行锁，用户B可以开始写操作，<font color="red">注意此时用户A在释放行锁前并没有完成mvcc事务</font></br>
+4. 用户A结束mvcc事务操作 </br>
+<img src="img/mvcc016.png">
+ </br>
+   writeQueue中非队头已完成mvcc的线程(上面情况#2)<font color="red">需等待 </font>
+<img src="img/mvcc017.png">
+ </br>
+ <font color="red">上面线程(情况#2)为什么会需要等待</font>
+<img src="img/mvcc018.png">
+ </br>
+<img src="img/mvcc019.png">
+ </br>
+
+
+
+
+
+
+
+   
+      
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
