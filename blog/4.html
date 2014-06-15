@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Yui2010.github.com by yui2010</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+ 
+        <h3>
+<a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>HBase存储架构(一)HFile</h3></p>
+
+
+ <font color="red"><p>HFile Version 1</p></font>
+
+
+<img src="img/hfile.png">
+<p> <font color="red">HFile Version 2 </font>hbase 0.92  v1 --> v2  <a href="https://issues.apache.org/jira/browse/HBASE-3857">https://issues.apache.org/jira/browse/HBASE-3857</a></p>
+<img src="img/hfilev2.png">  
+
+<p>hbase 0.92 重新设计了HFile结构 基于两个重要改进:1.Add Bloom Block Index Support(HBASE-3763) 2.Build a tree structure data block index inside of the HFile (HBASE-3856)  在facebook情景中  bloom filter 增长到2G data index 有6G 在启动RS全部加载这些数据 很大程度上影响了RS启动速度,对于HFile的改动 主要是增加索引 。HFileV2设计文档：<a href=" https://issues.apache.org/jira/secure/attachment/12482886/hfile_format_v2_design_draft_0.3.pdf">hfile_format_v2_design_draft_0.3.pdf</a>
+
+ <font color="red"><p><b>1.Bloom Filter</b> 什么是bloom filter   wiki:<a href=" http://en.wikipedia.org/wiki/Bloom_filter"> http://en.wikipedia.org/wiki/Bloom_filter</a></p></font>
+
+ <p>           &nbsp;&nbsp;hfile v2 对于bloom filter 的处理 分为bloom filter metadata(索引,启动加载) 和实际bloom block</p>
+ <p>           &nbsp;&nbsp; 1. bloom filter metadata 结构</p>
+<img src="img/hfile001.png" height="400" width="500"> 
+ <p>           &nbsp;&nbsp; 2. bloom filter block 结构</p>
+<img src="img/hfile002.png" height="400" width="500"> 
+<p>           &nbsp;&nbsp;  3. bloom filter 写入hfile</p>
+<p>在flush中 初始化 HFile.Writer(HFileWriterV2) 时候会实例化BloomFilterWriter 对象(默认CompoundBloomFilterWriter实现类)  
+generalBloomFilterWriter = BloomFilterFactory.createGeneralBloomAtWrite(conf, cacheConf, bloomType,(int) Math.min(maxKeys, Integer.MAX_VALUE), writer);   </br>
+hbase bloom filter几个变量值：</br>
+chunksize [m] -----> 131072*8= computeFoldableByteSize(computeFoldableByteSize(131072*8,7)*8,7)</br>
+ MaxKeys ----->109396=computeFoldableByteSize(131072*8,7)</br>
+ errorRate ------> 0.01</br>
+hashCount [k] ------> 7=optimalFunctionCount((int)idealMaxKeys(131072*8,0.01),131072*8)</br>
+
+ </br>
+<img src="img/hfile003.png" height="400" width="600"> 
+<img src="img/hfile004.png" height="400" width="600"> 
+</br>
+ <font color="red">#1. dynamic bloom filter </font>[论文：<a href="http://www.cse.fau.edu/~jie/research/publications/Publication_files/infocom2006.pdf">Theory and Network Applications of Dynamic Bloom Filters</a>] </br>
+在写入key超过最大值时候,会创建新的chunk来存储, 因为我们很难预料需要写入key的数量(n)来设置chunk的大小,一般情况下 动态扩展bloomfilter 会增加错误率，因为chunk的大小没有变化(或者增长因子扩展很小)。但幸运的是hbase是做有序写入key,在做存在判断时候只会在一个chunk里面 错误率不变。</br>
+<font color="red">#2.folding dynamic bloom filter</font></br>
+在chunk写入较少key时chunk浪费了很多空间存储,对于这一代价敏感情况下,折叠chunk变得很有效 副作用：错误率增加 (允许的范围之内) bloom filter有一个小技巧就是OR操作 ,比如在合并相同BF参数的chunk 只需要OR就可以了因为1|0=1 1|1=1 当前位置为1 就不用改变 这和计数BF(存储空间开销较大,一般4-6倍左右)不一样 hbase是采取另外创建chunk来存储删除的key</br>
+<img src="img/hfile005.png" height="400" width="600"> 
+</br>
+<img src="img/hfile006.png" height="200" width="600"> 
+</br>
+<img src="img/hfile007.png" height="150" width="600"> 
+</br>
+<p>           &nbsp;&nbsp;  3. bloom filter 判断</p>
+<img src="img/hfile008.png" height="400" width="600"> 
+
+</p>
+
+
+
+
+
+
+
+
+   
+      
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>

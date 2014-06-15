@@ -22,12 +22,12 @@
 下面分析是基于apache的0.98.1版本：</p>
  </br>
 region server 在打开region时会初始化一个mvcc变量(HRegion类变量)，整个mvcc是控制在该region范围。
-<img src="img/mvcc01.png">
+<img src="img/mvcc01.png"  height="50" width="260">
  </br>
 初始化：遍历HRegion所有的HStore的maxMemstoreTS  取出其中的最大值并+1作为当前的读写点
-<img src="img/mvcc011.png">
+<img src="img/mvcc011.png" >
  </br>
-以前的hbase版本中类MultiVersionConsistencyControl叫ReadWriteConsistencyControl(这个描述更直接，但不专业)，mvcc 是使用时间戳TS(timestamp)来控制读写， 前面HStore的maxMemstoreTS跟实际数据KV的mvcc值以及MultiVersionConsistencyControl的memstoreRead和memstoreWrite都是同一性质，只是在描述上有所不同(有的用TS，有的用mvcc)，
+mvcc 是使用时间戳TS(timestamp)来控制读写， 前面HStore的maxMemstoreTS跟实际数据KV的mvcc值以及MultiVersionConsistencyControl的memstoreRead和memstoreWrite都是同一性质，只是在描述上有所不同，以前的hbase版本中类MultiVersionConsistencyControl叫ReadWriteConsistencyControl(有的用TS，有的用mvcc 代码没有统一)，
 <img src="img/mvcc012.png">
  </br>
 用户写数据(PUT) 最终会调用HRegionServer的mutate方法-->HRgion的batchMutate方法，然后会做部分操作(循环竞争行锁)-->doMiniBatchMutation(此方法较长，省略部分代码)
@@ -47,10 +47,9 @@ MultiVersionConsistencyControl的内部类WriteEntry
    writeQueue中非队头已完成mvcc的线程(上面情况#2)<font color="red">需等待 </font>
 <img src="img/mvcc017.png">
  </br>
- <font color="red">上面线程(情况#2)为什么会需要等待</font>
-<img src="img/mvcc018.png">
- </br>
-<img src="img/mvcc019.png">
+ <font color="red">上面线程(情况#2)为什么会需要等待</font></br>
+<img src="img/mvcc018.png"  height="400" width="600">
+<img src="img/mvcc019.png"  height="400" width="600">
  </br>
 
 
